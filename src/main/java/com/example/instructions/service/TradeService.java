@@ -8,7 +8,6 @@ import com.example.instructions.model.PlatformTrade;
 import com.example.instructions.model.TradeType;
 import com.example.instructions.util.TradeTransformer;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -21,7 +20,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.StreamSupport;
 
 @Service
@@ -29,6 +30,10 @@ public class TradeService {
     private final TradeProperties props;
     private final KafkaPublisher publisher;
     private final CanonicalTradeCache cache;
+    private AtomicInteger successCSV = new AtomicInteger(0),
+            failCSV = new AtomicInteger(0),
+            successJson = new AtomicInteger(0),
+            failJson = new AtomicInteger(0);
 
     public TradeService(TradeProperties props, KafkaPublisher publisher,
                         CanonicalTradeCache cache) {
@@ -37,8 +42,10 @@ public class TradeService {
         this.cache = cache;
     }
 
-    public void processTradesFromCsv(MultipartFile file) throws Exception {
+    public Map<String, Integer> processTradesFromCsv(MultipartFile file) throws Exception {
         try (var reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            successCSV.set(0);
+            failCSV.set(0);
             CSVParser parser = CSVParser.parse(
                     reader,
                     CSVFormat.DEFAULT.builder()
@@ -54,11 +61,15 @@ public class TradeService {
                     .map(TradeTransformer::createPlatformTrade)
                     .forEach(this::publishTrade);
         }
+        int total = successCSV.get() + failCSV.get();
+        return Map.of("success", successCSV.get(), "fail", failCSV.get(),
+                "total", total);
     }
 
-    public void processTradesFromJson(MultipartFile file) throws IOException {
+    public Map<String, Integer> processTradesFromJson(MultipartFile file) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-
+        successJson.set(0);
+        failJson.set(0);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
             reader.lines().forEach(line -> {
                 try {
@@ -67,16 +78,21 @@ public class TradeService {
 
                     // validate and publish if valid
                     Optional<CanonicalTrade> optTrade = optionalValidateTrade(trade);
-                    optTrade.ifPresent(t -> {
+                    optTrade.ifPresentOrElse(t -> {
+                        successJson.incrementAndGet();
                         cache.put(t.tradeId(), t);
                         publishTrade(TradeTransformer.createPlatformTrade(t));
-                    });
+                    }, ()->failJson.incrementAndGet());
                 } catch (JsonProcessingException e) {
                     // malformed JSON line, skip and log
                     System.out.println("Skipping malformed JSON line " + e.getMessage());
                 }
+
             });
         }
+        int total = successCSV.get() + failCSV.get();
+        return Map.of("success", successCSV.get(), "fail", failCSV.get(),
+                "total", total);
     }
 
 
@@ -95,11 +111,13 @@ public class TradeService {
     private Optional<CSVRecord> optionalValidateRecord(CSVRecord record) {
         try {
             validateRecord(record);
+            successCSV.incrementAndGet();
             return Optional.of(record);
         }
         catch(Exception e) {
             System.out.println("Exception processing record with trade_id " +
                     record.get(props.getFields().getTradeId()) + " message: " + e.getMessage());
+            failCSV.incrementAndGet();
             return Optional.empty();
         }
     }

@@ -2,7 +2,6 @@ package com.example.instructions.service;
 
 import com.example.instructions.cache.CanonicalTradeCache;
 import com.example.instructions.model.CanonicalTrade;
-import com.example.instructions.model.PlatformTrade;
 import com.example.instructions.util.TradeTransformer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

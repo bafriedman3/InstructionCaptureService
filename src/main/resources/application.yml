@@ -12,7 +12,7 @@ trade:
     timestamp: timestamp
 spring:
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: host.docker.internal:9092
     inbound-topic: instructions.inbound
     outbound-topic: instructions.outbound
     consumer:
