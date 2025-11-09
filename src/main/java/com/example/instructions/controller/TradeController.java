@@ -1,6 +1,9 @@
 package com.example.instructions.controller;
 
 import com.example.instructions.service.TradeService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,8 +19,11 @@ public class TradeController {
         this.service = service;
     }
 
-    @PostMapping("/upload")
-    public Map<String, Integer> upload(@RequestParam("file") MultipartFile file) throws Exception {
+    @PostMapping(value="/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload CSV or JSON file containing trades")
+    public Map<String, Integer> upload(
+            @Parameter(description = "CSV or JSON file", required = true)
+            @RequestParam("file") MultipartFile file) throws Exception {
         String fileName = file.getOriginalFilename();
         if(fileName == null) {
             throw new IllegalArgumentException("Filename is null");
