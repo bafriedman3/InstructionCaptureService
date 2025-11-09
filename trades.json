@@ -1,0 +1,3 @@
+{"tradeId":"TRADE123","accountNumber":"ACCT9876","securityId":"NFLX","tradeType":"Buy","quantity":300,"timestamp":"2025-11-06T12:35:00P"}
+malformed
+{"tradeId":"TRADE456","accountNumber":"ACCT4321","securityId":"GOOGL","tradeType":"Sell","quantity":500,"timestamp":"2025-11-06T13:25:00Z"}

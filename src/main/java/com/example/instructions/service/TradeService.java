@@ -86,12 +86,13 @@ public class TradeService {
                 } catch (JsonProcessingException e) {
                     // malformed JSON line, skip and log
                     System.out.println("Skipping malformed JSON line " + e.getMessage());
+                    failJson.incrementAndGet();
                 }
 
             });
         }
-        int total = successCSV.get() + failCSV.get();
-        return Map.of("success", successCSV.get(), "fail", failCSV.get(),
+        int total = successJson.get() + failJson.get();
+        return Map.of("success", successJson.get(), "fail", failJson.get(),
                 "total", total);
     }
 

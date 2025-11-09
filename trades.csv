@@ -1,0 +1,4 @@
+trade_id,account_number,security_id,trade_type,quantity,timestamp
+TRADE123,ACCT9876,AAPL,Buy,300,2025-11-06T12:35:00Z
+badTrade
+TRADE456,ACCT4321,MSFT,Sell,500,2025-11-06T13:25:00Z

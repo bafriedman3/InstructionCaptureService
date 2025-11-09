@@ -1,0 +1,92 @@
+This microservice is intended to capture trades/instructions from either .csv or .json file or
+consume them from a kafka topic. The input trades contain the following fields:
+trade_id,account_number,security_id,trade_type,quantity,timestamp
+and a csv file has to contain a header and input lines as in the following example:
+
+trade_id,account_number,security_id,trade_type,quantity,timestamp
+TRADE123,ACCT9876,AAPL,Buy,300,2025-11-06T12:35:00Z
+badTrade
+TRADE456,ACCT4321,MSFT,Sell,500,2025-11-06T13:25:00Z
+
+In this case the first and the third rows will be successfully processed, but the second one
+will output a failure message. The file processing will continue despite the bad trades.
+
+The json source file needs to contain the trades as follows:
+
+{"tradeId":"TRADE123","accountNumber":"ACCT9876","securityId":"NFLX","tradeType":"Buy","quantity":300,"timestamp":"2025-11-06T12:35:00P"}
+malformed
+{"tradeId":"TRADE456","accountNumber":"ACCT4321","securityId":"GOOGL","tradeType":"Sell","quantity":500,"timestamp":"2025-11-06T13:25:00Z"}
+
+where the second line represents malformed json line. Each line is a separate json object, and
+processing will continue even if some of the lines are malformed, as line 2 in this example.
+
+This app requires a Kafka broker running on port 9092 as specified in application.yml in
+a configuration parameter
+
+bootstrap-servers: host.docker.internal:9092
+
+(the host.docker.internal is required for docker container to be able to connect with it on a
+Windows desktop). Kafka broker can run on localhost:9092 and if not running from a docker
+container, it can run on a different host, which should be configured in bootstrap-servers
+parameter.
+Kafka also should have instructions.inbound and instructions.outbound topics defined.
+
+This app will not run without Kafka broker being up. In the next version I could make Kafka
+publishing optional and the app could still work if Kafka broker is not up, however that
+functionality is not available in this version.
+
+The trades are being converted to this format:
+
+{"platform_id":"PLAT123","trade":{"account":"****4321","security":"GOOGL","type":"S","amount":500,"timestamp":"2025-11-06T13:25:00Z"}}
+and published to Kafka outbound topic instructions.outbound
+
+The trades could also come from instruction.inbound Kafka topic in the following message
+format (json):
+{"tradeId":"TRADE123","accountNumber":"ACCT7543","securityId":"AAPL","tradeType":"Buy","quantity":300,"timestamp":"2025-11-06T12:35:00Z"}
+
+There is a REST endpoint /api/trades/upload, which receives and processes the uploaded file.
+
+If the uploaded file is very large, part of it can be kept in temporary storage, and not fully
+loaded into memory. The file processing is line by line and the result does not go into a
+full collection, therefore not loading the whole file into memory.
+
+In order to avoid loading full contents of trades into memory, I only return the stats
+of the processed trades, e.g.
+{"fail":1,"success":2,"total":3}
+
+Each platform trade though are being sent to instruction.outbound topic immediately upon
+processing.
+
+There is a cache with eviction (containing 10000 elements), evicting the oldest entries
+after it reaches its capacity. This is also needed in order to avoid keeping the whole
+set of trades in memory without clearing the cache.
+
+In order to run the project clone the repository:
+
+git clone https://github.com/bafriedman3/InstructionCaptureService.git
+cd InstructionCaptureService
+mvn clean package
+java -jar InstructionCaptureService-1.0-SNAPSHOT.jar
+
+(make sure you also run Kafka e.g.
+.\bin\windows\kafka-server-start.bat config\server.properties)
+
+To upload a file using curl:
+curl -X POST -F "file=@trades.csv" http://localhost:8080/api/trades/upload
+or
+curl -X POST -F "file=@trades.json" http://localhost:8080/api/trades/upload
+
+(sample files are in the repository root).
+
+Using Swagger
+http://localhost:8080/swagger-ui/index.html
+
+and use upload endpoint.
+
+The app can also be built using docker and run as a docker container
+(in the repository root dir)
+docker build -t trade-capture .
+docker run -p 8080:8080 trade-capture
+
+Integration tests are provided in the test directory, although not with full coverage
+(validation and file processing are covered)
