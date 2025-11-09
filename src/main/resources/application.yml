@@ -1,0 +1,25 @@
+trade:
+  max-account-num-size: 32
+  max-file-size: 50000000
+  max-sec-id-size: 32
+  record-size: 6
+  fields:
+    trade-id: trade_id
+    acct-num: account_number
+    sec-id: security_id
+    trade-type: trade_type
+    quantity: quantity
+    timestamp: timestamp
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    inbound-topic: instructions.inbound
+    outbound-topic: instructions.outbound
+    consumer:
+      group-id: trade-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: com.example.instructions.model.CanonicalTrade
